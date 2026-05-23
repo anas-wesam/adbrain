@@ -13,9 +13,10 @@ async function generateWithPollinations(prompt: string): Promise<string> {
   return Buffer.from(buffer).toString("base64");
 }
 
-/** Try Gemini image generation; returns base64 string or throws */
-async function generateWithGemini(
+/** Try Gemini image generation with a specific model; returns base64 string or throws */
+async function generateWithGeminiModel(
   apiKey: string,
+  model: string,
   prompt: string,
   imageBase64?: string,
   imageMime?: string
@@ -35,7 +36,7 @@ async function generateWithGemini(
   }
 
   const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-image",
+    model,
     contents: [{ role: "user", parts }],
     config: { responseModalities: ["IMAGE", "TEXT"] },
   });
@@ -51,19 +52,28 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.GOOGLE_AI_API_KEY;
   const hasValidKey = apiKey && apiKey !== "your_google_ai_api_key_here";
 
+  // Gemini models to try in order (free tier first)
+  const geminiModels = [
+    "gemini-2.0-flash-exp",
+    "gemini-2.5-flash-image",
+  ];
+
   try {
-    // 1️⃣  Try Gemini first (supports reference image editing)
     if (hasValidKey) {
-      try {
-        const imageData = await generateWithGemini(apiKey!, prompt, imageBase64, imageMime);
-        return NextResponse.json({ imageData });
-      } catch (geminiErr) {
-        console.warn("Gemini failed, falling back to Pollinations:", geminiErr);
-        // Fall through to Pollinations ↓
+      for (const model of geminiModels) {
+        try {
+          const imageData = await generateWithGeminiModel(apiKey!, model, prompt, imageBase64, imageMime);
+          console.log(`Image generated with ${model}`);
+          return NextResponse.json({ imageData });
+        } catch (err) {
+          console.warn(`${model} failed:`, err);
+          // Try next model ↓
+        }
       }
     }
 
-    // 2️⃣  Fallback: Pollinations AI (free, text-to-image only)
+    // Final fallback: Pollinations AI (free, no key needed)
+    console.warn("All Gemini models failed, using Pollinations");
     const imageData = await generateWithPollinations(prompt);
     return NextResponse.json({ imageData });
   } catch (error) {
