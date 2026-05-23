@@ -74,9 +74,9 @@ export default function Home() {
         });
         const data = await res.json();
         if (data.imageData) {
-          const img = addImage({ prompt, imageData: data.imageData });
+          const img = await addImage({ prompt, imageData: data.imageData });
 
-          uploadBase64Image(data.imageData, `${img.id}.png`)
+          uploadBase64Image(data.imageData, `${(await img).id}.png`)
             .then((storageUrl) =>
               saveImageRecord({ prompt, storageUrl, sessionId })
             )
