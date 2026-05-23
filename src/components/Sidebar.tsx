@@ -11,10 +11,10 @@ import {
 } from "lucide-react";
 
 const tabs = [
-  { id: "chat" as ActiveTab, label: "الشات الذكي", icon: MessageSquare },
   { id: "generate" as ActiveTab, label: "توليد صور", icon: Image },
-  { id: "campaign" as ActiveTab, label: "حملة إعلانية", icon: Megaphone },
   { id: "gallery" as ActiveTab, label: "معرض الصور", icon: GalleryHorizontalEnd },
+  { id: "chat" as ActiveTab, label: "الشات الذكي", icon: MessageSquare },
+  { id: "campaign" as ActiveTab, label: "حملة إعلانية", icon: Megaphone },
 ];
 
 type Props = {
