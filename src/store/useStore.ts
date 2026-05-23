@@ -6,6 +6,8 @@ export type Message = {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  imageBase64?: string;
+  imageMime?: string;
 };
 
 export type GeneratedImage = {

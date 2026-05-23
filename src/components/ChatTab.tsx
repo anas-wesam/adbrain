@@ -1,27 +1,46 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { Message } from "@/store/useStore";
-import { Send, Brain, User, Loader2 } from "lucide-react";
+import { Send, Brain, User, Loader2, Paperclip, X, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Props = {
   messages: Message[];
   isLoading: boolean;
-  onSend: (text: string) => void;
+  onSend: (text: string, imageBase64?: string, imageMime?: string) => void;
 };
 
 export default function ChatTab({ messages, isLoading, onSend }: Props) {
   const [input, setInput] = useState("");
+  const [previewImage, setPreviewImage] = useState<{ base64: string; mime: string; name: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // result is "data:image/jpeg;base64,XXXX"
+      const [meta, base64] = result.split(",");
+      const mime = meta.split(":")[1].split(";")[0];
+      setPreviewImage({ base64, mime, name: file.name });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const handleSend = () => {
-    if (!input.trim() || isLoading) return;
-    onSend(input.trim());
+    if ((!input.trim() && !previewImage) || isLoading) return;
+    const text = input.trim() || "حلّل هذه الصورة وقترح محتوى تسويقي مناسب";
+    onSend(text, previewImage?.base64, previewImage?.mime);
     setInput("");
+    setPreviewImage(null);
   };
 
   return (
@@ -35,7 +54,7 @@ export default function ChatTab({ messages, isLoading, onSend }: Props) {
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-3">مرحباً بك في أد برين!</h2>
             <p className="text-gray-500 max-w-md leading-relaxed">
-              أنا مساعدك التسويقي الذكي. أخبرني عن علامتك التجارية وسأساعدك في إنشاء محتوى تسويقي احترافي.
+              أنا مساعدك التسويقي الذكي. أخبرني عن علامتك التجارية أو أرسل صورة مرجعية وسأساعدك في إنشاء محتوى تسويقي احترافي.
             </p>
             <div className="grid grid-cols-2 gap-3 mt-8 w-full max-w-lg">
               {[
@@ -77,12 +96,19 @@ export default function ChatTab({ messages, isLoading, onSend }: Props) {
             </div>
             <div
               className={cn(
-                "max-w-[75%] rounded-2xl px-5 py-3 text-sm leading-relaxed",
+                "max-w-[75%] rounded-2xl px-5 py-3 text-sm leading-relaxed space-y-2",
                 msg.role === "user"
                   ? "bg-purple-600 text-white rounded-tl-md"
                   : "bg-gray-100 text-gray-800 rounded-tr-md"
               )}
             >
+              {msg.imageBase64 && (
+                <img
+                  src={`data:${msg.imageMime};base64,${msg.imageBase64}`}
+                  alt="صورة مرجعية"
+                  className="rounded-xl max-w-[240px] max-h-[240px] object-cover"
+                />
+              )}
               <p className="whitespace-pre-wrap">{msg.content}</p>
               <p className={cn("text-xs mt-1", msg.role === "user" ? "text-purple-200" : "text-gray-400")}>
                 {msg.timestamp.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}
@@ -105,15 +131,44 @@ export default function ChatTab({ messages, isLoading, onSend }: Props) {
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-gray-100 bg-white">
-        <div className="flex gap-3 items-end">
+      <div className="border-t border-gray-100 bg-white">
+        {/* Image preview */}
+        {previewImage && (
+          <div className="px-4 pt-3 flex items-center gap-3">
+            <div className="relative inline-block">
+              <img
+                src={`data:${previewImage.mime};base64,${previewImage.base64}`}
+                alt="معاينة"
+                className="h-16 w-16 object-cover rounded-xl border border-gray-200"
+              />
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
+              >
+                <X className="w-3 h-3 text-white" />
+              </button>
+            </div>
+            <div className="text-xs text-gray-500">
+              <div className="flex items-center gap-1">
+                <ImageIcon className="w-3 h-3" />
+                <span>{previewImage.name}</span>
+              </div>
+              <p className="text-gray-400 mt-0.5">سيتم إرسال الصورة مع رسالتك إلى Gemini</p>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-3 items-end p-4">
+          {/* Send */}
           <button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading}
+            disabled={(!input.trim() && !previewImage) || isLoading}
             className="w-11 h-11 bg-gradient-to-br from-purple-600 to-blue-600 rounded-xl flex items-center justify-center flex-shrink-0 disabled:opacity-40 hover:shadow-lg transition-all"
           >
             <Send className="w-4 h-4 text-white rotate-180" />
           </button>
+
+          {/* Text input */}
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -123,10 +178,32 @@ export default function ChatTab({ messages, isLoading, onSend }: Props) {
                 handleSend();
               }
             }}
-            placeholder="اكتب رسالتك هنا..."
+            placeholder={previewImage ? "اكتب تعليماتك للصورة (أو اتركه فارغاً للتحليل التلقائي)..." : "اكتب رسالتك هنا..."}
             rows={1}
             className="flex-1 resize-none border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-purple-400 bg-gray-50 text-right"
             style={{ maxHeight: "120px" }}
+          />
+
+          {/* Upload image */}
+          <button
+            onClick={() => fileRef.current?.click()}
+            title="إرفاق صورة مرجعية"
+            className={cn(
+              "w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 transition-all border",
+              previewImage
+                ? "bg-purple-100 border-purple-300 text-purple-600"
+                : "bg-gray-50 border-gray-200 text-gray-400 hover:bg-purple-50 hover:border-purple-300 hover:text-purple-600"
+            )}
+          >
+            <Paperclip className="w-4 h-4" />
+          </button>
+
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
           />
         </div>
       </div>

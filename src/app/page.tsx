@@ -28,13 +28,12 @@ export default function Home() {
   } = useAppStore();
 
   const handleChatSend = useCallback(
-    async (text: string) => {
+    async (text: string, imageBase64?: string, imageMime?: string) => {
       if (userCredits < 1) return;
-      addMessage({ role: "user", content: text });
+      addMessage({ role: "user", content: text, imageBase64, imageMime });
       setIsLoading(true);
       deductCredits(1);
 
-      // Save user message to Firestore (fire-and-forget)
       saveMessage(sessionId, { role: "user", content: text }).catch(() => {});
 
       try {
@@ -45,10 +44,10 @@ export default function Home() {
         const res = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: allMessages }),
+          body: JSON.stringify({ messages: allMessages, imageBase64, imageMime }),
         });
         const data = await res.json();
-        const replyText = data.text || "عذراً، حدث خطأ. حاول مرة أخرى.";
+        const replyText = data.text || data.error || "عذراً، حدث خطأ. حاول مرة أخرى.";
         addMessage({ role: "assistant", content: replyText });
         saveMessage(sessionId, { role: "assistant", content: replyText }).catch(() => {});
       } catch {
@@ -117,7 +116,7 @@ export default function Home() {
 
         <div className="flex-1 overflow-hidden">
           {activeTab === "chat" && (
-            <ChatTab messages={messages} isLoading={isLoading} onSend={handleChatSend} />
+            <ChatTab messages={messages} isLoading={isLoading} onSend={handleChatSend as (text: string, imageBase64?: string, imageMime?: string) => void} />
           )}
           {activeTab === "generate" && (
             <div className="h-full overflow-y-auto">
