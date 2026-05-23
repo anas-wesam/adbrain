@@ -98,7 +98,7 @@ export default function ChatTab({ messages, isLoading, onSend }: Props) {
               className={cn(
                 "max-w-[75%] rounded-2xl px-5 py-3 text-sm leading-relaxed space-y-2",
                 msg.role === "user"
-                  ? "bg-purple-600 text-white rounded-tl-md"
+                  ? "bg-purple-600 text-black rounded-tl-md"
                   : "bg-gray-100 text-gray-800 rounded-tr-md"
               )}
             >
