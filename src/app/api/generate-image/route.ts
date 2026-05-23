@@ -52,8 +52,9 @@ export async function POST(req: NextRequest) {
   const apiKey = process.env.GOOGLE_AI_API_KEY;
   const hasValidKey = apiKey && apiKey !== "your_google_ai_api_key_here";
 
-  // Gemini models to try in order (free tier first)
+  // Gemini models to try in order (same free models used for chat first)
   const geminiModels = [
+    "gemini-2.5-flash",
     "gemini-2.0-flash-exp",
     "gemini-2.5-flash-image",
   ];
