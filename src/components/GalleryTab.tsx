@@ -7,7 +7,8 @@ import { loadImages } from "@/hooks/useFirestore";
 type FirestoreImage = {
   id: string;
   prompt: string;
-  storageUrl: string;
+  storageUrl?: string;
+  thumbnailBase64?: string;
   timestamp: Date;
 };
 
@@ -23,7 +24,10 @@ export default function GalleryTab({ images: localImages }: Props) {
     setLoading(true);
     loadImages()
       .then((imgs) => {
-        const valid = imgs.filter((i) => (i as FirestoreImage & { storageUrl?: string }).storageUrl) as unknown as FirestoreImage[];
+        // Accept images that have either a storageUrl or a thumbnailBase64
+        const valid = imgs.filter(
+          (i) => (i as FirestoreImage).storageUrl || (i as FirestoreImage).thumbnailBase64
+        ) as unknown as FirestoreImage[];
         setFirestoreImages(valid);
       })
       .catch(() => {})
@@ -84,14 +88,17 @@ export default function GalleryTab({ images: localImages }: Props) {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {/* Firestore images (persisted) */}
-        {firestoreImages.map((img) => (
-          <ImageCard
-            key={img.id}
-            src={img.storageUrl}
-            prompt={img.prompt}
-            onDownload={() => handleDownload(img.storageUrl, img.id)}
-          />
-        ))}
+        {firestoreImages.map((img) => {
+          const src = img.storageUrl ?? `data:image/jpeg;base64,${img.thumbnailBase64}`;
+          return (
+            <ImageCard
+              key={img.id}
+              src={src}
+              prompt={img.prompt}
+              onDownload={() => handleDownload(src, img.id)}
+            />
+          );
+        })}
 
         {/* Local-only images (just generated, uploading) */}
         {localOnly.map((img) => (

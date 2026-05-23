@@ -8,6 +8,9 @@ import {
   limit,
   serverTimestamp,
   Timestamp,
+  doc,
+  setDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Message, GeneratedImage } from "@/store/useStore";
@@ -46,21 +49,33 @@ export async function loadMessages(sessionId: string): Promise<Message[]> {
 // ── Images ────────────────────────────────────────────────
 
 export async function saveImageRecord(record: {
+  id: string; // local UUID — used as Firestore doc ID for deduplication
   prompt: string;
-  storageUrl: string;
   sessionId: string;
+  thumbnailBase64?: string;
+  storageUrl?: string;
 }) {
-  const docRef = await addDoc(collection(db, "images"), {
+  const ref = doc(db, "images", record.id);
+  await setDoc(ref, {
     prompt: record.prompt,
-    storageUrl: record.storageUrl,
     sessionId: record.sessionId,
+    thumbnailBase64: record.thumbnailBase64 ?? null,
+    storageUrl: record.storageUrl ?? null,
     createdAt: serverTimestamp(),
   });
-  return docRef.id;
+  return record.id;
+}
+
+export async function updateImageRecord(
+  id: string,
+  updates: { storageUrl?: string }
+) {
+  const ref = doc(db, "images", id);
+  await updateDoc(ref, updates);
 }
 
 export async function loadImages(): Promise<
-  (GeneratedImage & { storageUrl?: string })[]
+  (GeneratedImage & { storageUrl?: string; thumbnailBase64?: string })[]
 > {
   const q = query(
     collection(db, "images"),
@@ -72,7 +87,8 @@ export async function loadImages(): Promise<
     id: doc.id,
     prompt: doc.data().prompt,
     imageData: "",
-    storageUrl: doc.data().storageUrl,
+    storageUrl: doc.data().storageUrl ?? undefined,
+    thumbnailBase64: doc.data().thumbnailBase64 ?? undefined,
     timestamp:
       doc.data().createdAt instanceof Timestamp
         ? doc.data().createdAt.toDate()

@@ -6,7 +6,7 @@ import GenerateTab from "@/components/GenerateTab";
 import CampaignTab from "@/components/CampaignTab";
 import GalleryTab from "@/components/GalleryTab";
 import { useAppStore, GeneratedImage } from "@/store/useStore";
-import { saveMessage, saveImageRecord } from "@/hooks/useFirestore";
+import { saveMessage, saveImageRecord, updateImageRecord } from "@/hooks/useFirestore";
 import { uploadBase64Image } from "@/hooks/useStorage";
 import { compressImage } from "@/lib/compress";
 
@@ -76,10 +76,16 @@ export default function Home() {
         if (data.imageData) {
           const img = await addImage({ prompt, imageData: data.imageData });
 
-          uploadBase64Image(data.imageData, `${(await img).id}.png`)
-            .then((storageUrl) =>
-              saveImageRecord({ prompt, storageUrl, sessionId })
-            )
+          // Save thumbnail to Firestore immediately so gallery persists on refresh
+          // Use local UUID as Firestore doc ID so deduplication works in gallery
+          const thumb = await compressImage(data.imageData, "image/png", 400, 0.5);
+          saveImageRecord({ id: img.id, prompt, sessionId, thumbnailBase64: thumb.base64 })
+            .then(() => {
+              // Try to upgrade to full Storage URL in background
+              uploadBase64Image(data.imageData, `${img.id}.png`)
+                .then((storageUrl) => updateImageRecord(img.id, { storageUrl }))
+                .catch(() => {});
+            })
             .catch(() => {});
 
           return img;
