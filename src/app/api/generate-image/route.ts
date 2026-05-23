@@ -14,17 +14,16 @@ export async function POST(req: NextRequest) {
 
     const parts: Part[] = [];
 
+    const noTextInstruction = `IMPORTANT: Do NOT include any text, letters, words, numbers, or typography in the image. The image must be text-free. Focus only on visual elements, product, background, lighting, and composition.`;
+
     if (imageBase64 && imageMime) {
-      // Reference image provided — include it for style/context
+      parts.push({ inlineData: { data: imageBase64, mimeType: imageMime } });
       parts.push({
-        inlineData: { data: imageBase64, mimeType: imageMime },
-      });
-      parts.push({
-        text: `بناءً على هذه الصورة المرجعية، أنشئ صورة إعلانية احترافية عالية الجودة بالمواصفات التالية: ${prompt}. حافظ على نفس الأسلوب والألوان العامة للصورة المرجعية مع إضافة طابع إعلاني احترافي.`,
+        text: `Based on this reference image, create a professional high-quality advertising photo: ${prompt}. Keep the same style, colors and composition. ${noTextInstruction}`,
       });
     } else {
       parts.push({
-        text: `أنشئ صورة إعلانية احترافية عالية الجودة: ${prompt}. الصورة يجب أن تكون بجودة تجارية، ألوان زاهية، تصميم عصري نظيف.`,
+        text: `Create a professional high-quality advertising image: ${prompt}. Commercial quality, vibrant colors, modern clean design, studio lighting. ${noTextInstruction}`,
       });
     }
 

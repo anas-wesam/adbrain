@@ -1,7 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { GeneratedImage } from "@/store/useStore";
-import { ImageIcon, Loader2, Download, Wand2, Paperclip, X, Sparkles } from "lucide-react";
+import { ImageIcon, Loader2, Download, Wand2, Paperclip, X, Sparkles, Type } from "lucide-react";
 
 type Props = {
   onGenerate: (prompt: string, imageBase64?: string, imageMime?: string) => Promise<GeneratedImage | null>;
@@ -16,12 +16,23 @@ const suggestions = [
   "مخبوزات طازجة وقهوة عربية",
 ];
 
+const overlayPositions = [
+  { id: "top", label: "أعلى" },
+  { id: "center", label: "وسط" },
+  { id: "bottom", label: "أسفل" },
+] as const;
+
+type OverlayPosition = "top" | "center" | "bottom";
+
 export default function GenerateTab({ onGenerate, isLoading, credits }: Props) {
   const [prompt, setPrompt] = useState("");
   const [lastImage, setLastImage] = useState<GeneratedImage | null>(null);
   const [error, setError] = useState("");
   const [refImage, setRefImage] = useState<{ base64: string; mime: string; name: string } | null>(null);
+  const [overlayText, setOverlayText] = useState("");
+  const [overlayPos, setOverlayPos] = useState<OverlayPosition>("bottom");
   const fileRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -45,22 +56,70 @@ export default function GenerateTab({ onGenerate, isLoading, credits }: Props) {
     else setError("حدث خطأ في توليد الصورة. حاول مرة أخرى.");
   };
 
+  // Draw image + Arabic text overlay on canvas then download
   const handleDownload = () => {
     if (!lastImage) return;
-    const a = document.createElement("a");
-    a.href = `data:image/png;base64,${lastImage.imageData}`;
-    a.download = `adbrain-${Date.now()}.png`;
-    a.click();
+
+    if (!overlayText.trim()) {
+      // No overlay — download raw image
+      const a = document.createElement("a");
+      a.href = `data:image/png;base64,${lastImage.imageData}`;
+      a.download = `adbrain-${Date.now()}.png`;
+      a.click();
+      return;
+    }
+
+    const canvas = canvasRef.current!;
+    const ctx = canvas.getContext("2d")!;
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+
+      // Overlay band height
+      const bandH = Math.round(img.height * 0.14);
+      const bandY =
+        overlayPos === "top" ? 0
+        : overlayPos === "center" ? Math.round((img.height - bandH) / 2)
+        : img.height - bandH;
+
+      // Semi-transparent band
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillRect(0, bandY, img.width, bandH);
+
+      // Arabic text — right-aligned
+      const fontSize = Math.round(bandH * 0.42);
+      ctx.font = `bold ${fontSize}px Cairo, Arial, sans-serif`;
+      ctx.fillStyle = "#ffffff";
+      ctx.direction = "rtl";
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      ctx.fillText(overlayText, img.width - 24, bandY + bandH / 2, img.width - 48);
+
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `adbrain-${Date.now()}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      }, "image/png");
+    };
+    img.src = `data:image/png;base64,${lastImage.imageData}`;
   };
+
+  const imageSrc = lastImage ? `data:image/png;base64,${lastImage.imageData}` : null;
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-2">توليد صور إعلانية</h2>
-        <p className="text-gray-500">صف فكرتك بالعربي — مع أو بدون صورة مرجعية</p>
+        <p className="text-gray-500">صف فكرتك — مع أو بدون صورة مرجعية</p>
       </div>
 
-      {/* Reference Image Upload */}
+      {/* Reference Image */}
       <div className="mb-4">
         {refImage ? (
           <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex items-center gap-4">
@@ -103,16 +162,12 @@ export default function GenerateTab({ onGenerate, isLoading, credits }: Props) {
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
       </div>
 
-      {/* Prompt Input */}
+      {/* Prompt */}
       <div className="bg-white border border-gray-200 rounded-2xl p-4 mb-4">
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder={
-            refImage
-              ? "صف ما تريد إنشاءه بناءً على الصورة... مثال: اعمل إعلاناً لنفس المنتج بخلفية بيضاء"
-              : "مثال: إعلان عطر فاخر، خلفية ذهبية، جودة عالية..."
-          }
+          placeholder={refImage ? "صف ما تريد بناءً على الصورة... مثال: نفس المنتج بخلفية بيضاء" : "مثال: إعلان عطر فاخر، خلفية ذهبية، جودة عالية..."}
           rows={3}
           className="w-full resize-none text-right text-sm focus:outline-none text-gray-700 placeholder-gray-400"
         />
@@ -123,32 +178,23 @@ export default function GenerateTab({ onGenerate, isLoading, credits }: Props) {
             className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white px-6 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40 hover:shadow-lg transition-all"
           >
             {isLoading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {refImage ? "Gemini يحلل الصورة..." : "جاري التوليد..."}
-              </>
+              <><Loader2 className="w-4 h-4 animate-spin" />{refImage ? "Gemini يحلل..." : "جاري التوليد..."}</>
             ) : (
-              <>
-                <Wand2 className="w-4 h-4" />
-                {refImage ? "ولّد بناءً على المرجع" : "ولّد الصورة"}
-              </>
+              <><Wand2 className="w-4 h-4" />{refImage ? "ولّد بناءً على المرجع" : "ولّد الصورة"}</>
             )}
           </button>
           <span className="text-xs text-gray-400">5 رصيد • رصيدك: {credits}</span>
         </div>
       </div>
 
-      {/* Suggestions — only when no ref image */}
+      {/* Suggestions */}
       {!refImage && (
         <div className="mb-6">
           <p className="text-xs text-gray-400 mb-2">اقتراحات سريعة:</p>
           <div className="flex flex-wrap gap-2">
             {suggestions.map((s) => (
-              <button
-                key={s}
-                onClick={() => setPrompt(s)}
-                className="text-xs bg-gray-100 hover:bg-purple-100 text-gray-600 hover:text-purple-700 px-3 py-1.5 rounded-lg transition-all"
-              >
+              <button key={s} onClick={() => setPrompt(s)}
+                className="text-xs bg-gray-100 hover:bg-purple-100 text-gray-600 hover:text-purple-700 px-3 py-1.5 rounded-lg transition-all">
                 {s}
               </button>
             ))}
@@ -157,28 +203,58 @@ export default function GenerateTab({ onGenerate, isLoading, credits }: Props) {
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-red-600 text-sm text-right">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 text-red-600 text-sm text-right">{error}</div>
       )}
 
       {/* Generated Image */}
-      {lastImage && (
-        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-          <img
-            src={`data:image/png;base64,${lastImage.imageData}`}
-            alt="صورة مولّدة"
-            className="w-full object-cover"
-          />
-          <div className="p-4 flex items-center justify-between">
-            <p className="text-sm text-gray-500 truncate flex-1 ml-3">{lastImage.prompt}</p>
-            <button
-              onClick={handleDownload}
-              className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-700 font-medium"
-            >
-              <Download className="w-4 h-4" />
-              تحميل
-            </button>
+      {imageSrc && (
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-4">
+          {/* Preview with live text overlay */}
+          <div className="relative">
+            <img src={imageSrc} alt="صورة مولّدة" className="w-full object-cover" />
+            {overlayText.trim() && (
+              <div className={`absolute left-0 right-0 bg-black/55 px-4 py-3 flex items-center justify-end
+                ${overlayPos === "top" ? "top-0" : overlayPos === "center" ? "top-1/2 -translate-y-1/2" : "bottom-0"}`}>
+                <p className="text-white font-bold text-lg text-right leading-snug"
+                  style={{ fontFamily: "Cairo, Arial, sans-serif", direction: "rtl" }}>
+                  {overlayText}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Text overlay controls */}
+          <div className="p-4 border-t border-gray-100 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <Type className="w-4 h-4 text-purple-600" />
+              <span>أضف نص عربي فوق الصورة</span>
+            </div>
+            <input
+              value={overlayText}
+              onChange={(e) => setOverlayText(e.target.value)}
+              placeholder="مثال: خصم ٥٠٪ | اطلب الآن"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-right focus:outline-none focus:border-purple-400"
+              dir="rtl"
+            />
+            {overlayText.trim() && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">موضع النص:</span>
+                {overlayPositions.map((p) => (
+                  <button key={p.id} onClick={() => setOverlayPos(p.id)}
+                    className={`text-xs px-3 py-1.5 rounded-lg transition-all ${overlayPos === p.id ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-xs text-gray-400 truncate flex-1 ml-3">{lastImage?.prompt}</p>
+              <button onClick={handleDownload}
+                className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-700 font-medium flex-shrink-0">
+                <Download className="w-4 h-4" />
+                تحميل
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -189,6 +265,9 @@ export default function GenerateTab({ onGenerate, isLoading, credits }: Props) {
           <p className="text-gray-400">ستظهر الصورة المولّدة هنا</p>
         </div>
       )}
+
+      {/* Hidden canvas for text compositing on download */}
+      <canvas ref={canvasRef} className="hidden" />
     </div>
   );
 }
