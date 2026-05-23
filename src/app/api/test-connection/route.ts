@@ -13,7 +13,7 @@ export async function GET() {
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     const result = await model.generateContent("قل مرحباً بكلمة واحدة فقط بالعربي");
     const text = result.response.text();
 
@@ -21,7 +21,7 @@ export async function GET() {
       status: "connected",
       message: "✅ Gemini متصل وشغّال",
       test_response: text,
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
     });
   } catch (err: unknown) {
     const error = err as { message?: string; status?: number };

@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
 
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-2.5-flash",
       systemInstruction: `أنت "أد برين"، مساعد تسويقي ذكي متخصص للشركات والعلامات التجارية العربية.
 مهمتك:
 - مساعدة أصحاب المشاريع في كتابة محتوى تسويقي احترافي بالعربي
