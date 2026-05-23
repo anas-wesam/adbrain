@@ -8,6 +8,7 @@ import GalleryTab from "@/components/GalleryTab";
 import { useAppStore, GeneratedImage } from "@/store/useStore";
 import { saveMessage, saveImageRecord } from "@/hooks/useFirestore";
 import { uploadBase64Image } from "@/hooks/useStorage";
+import { compressImage } from "@/lib/compress";
 
 const SESSION_ID = "session_" + Math.random().toString(36).slice(2, 10);
 
@@ -94,8 +95,9 @@ export default function Home() {
   );
 
   const handleSendToChat = useCallback(
-    (imageBase64: string, imagePrompt: string) => {
+    async (imageBase64: string, imagePrompt: string) => {
       setActiveTab("chat");
+
       const metaPrompt = `لدي هذه الصورة الإعلانية (${imagePrompt}).
 
 أريد منك إنشاء كل ما يلزم لإعلان Meta (فيسبوك وإنستغرام) احترافي يشمل:
@@ -109,8 +111,11 @@ export default function Home() {
 
 اكتب كل قسم بوضوح ومنظم.`;
 
+      // Compress generated image before sending to chat (1.5MB → ~150KB)
+      const compressed = await compressImage(imageBase64, "image/png", 800, 0.7);
+
       setTimeout(() => {
-        handleChatSend(metaPrompt, imageBase64, "image/png");
+        handleChatSend(metaPrompt, compressed.base64, compressed.mime);
       }, 300);
     },
     [setActiveTab, handleChatSend]
