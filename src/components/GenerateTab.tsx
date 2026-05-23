@@ -1,10 +1,11 @@
 "use client";
 import { useRef, useState } from "react";
 import { GeneratedImage } from "@/store/useStore";
-import { ImageIcon, Loader2, Download, Wand2, Paperclip, X, Sparkles, Type } from "lucide-react";
+import { ImageIcon, Loader2, Download, Wand2, Paperclip, X, Sparkles, Type, MessageSquare } from "lucide-react";
 
 type Props = {
   onGenerate: (prompt: string, imageBase64?: string, imageMime?: string) => Promise<GeneratedImage | null>;
+  onSendToChat: (imageBase64: string, prompt: string) => void;
   isLoading: boolean;
   credits: number;
 };
@@ -24,7 +25,7 @@ const overlayPositions = [
 
 type OverlayPosition = "top" | "center" | "bottom";
 
-export default function GenerateTab({ onGenerate, isLoading, credits }: Props) {
+export default function GenerateTab({ onGenerate, onSendToChat, isLoading, credits }: Props) {
   const [prompt, setPrompt] = useState("");
   const [lastImage, setLastImage] = useState<GeneratedImage | null>(null);
   const [error, setError] = useState("");
@@ -247,13 +248,22 @@ export default function GenerateTab({ onGenerate, isLoading, credits }: Props) {
                 ))}
               </div>
             )}
-            <div className="flex items-center justify-between pt-1">
-              <p className="text-xs text-gray-400 truncate flex-1 ml-3">{lastImage?.prompt}</p>
-              <button onClick={handleDownload}
-                className="flex items-center gap-2 text-sm text-purple-600 hover:text-purple-700 font-medium flex-shrink-0">
-                <Download className="w-4 h-4" />
-                تحميل
-              </button>
+            <div className="flex items-center justify-between pt-1 gap-3">
+              <p className="text-xs text-gray-400 truncate flex-1">{lastImage?.prompt}</p>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <button
+                  onClick={() => lastImage && onSendToChat(lastImage.imageData, lastImage.prompt)}
+                  className="flex items-center gap-1.5 text-sm text-blue-600 hover:text-blue-700 font-medium"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  ولّد إعلان
+                </button>
+                <button onClick={handleDownload}
+                  className="flex items-center gap-1.5 text-sm text-purple-600 hover:text-purple-700 font-medium">
+                  <Download className="w-4 h-4" />
+                  تحميل
+                </button>
+              </div>
             </div>
           </div>
         </div>

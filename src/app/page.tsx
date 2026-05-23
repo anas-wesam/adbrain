@@ -93,6 +93,29 @@ export default function Home() {
     [userCredits, addImage, setIsLoading, deductCredits, sessionId]
   );
 
+  const handleSendToChat = useCallback(
+    (imageBase64: string, imagePrompt: string) => {
+      setActiveTab("chat");
+      const metaPrompt = `لدي هذه الصورة الإعلانية (${imagePrompt}).
+
+أريد منك إنشاء كل ما يلزم لإعلان Meta (فيسبوك وإنستغرام) احترافي يشمل:
+
+1. **العنوان الرئيسي (Headline)** — جملة قصيرة جذابة (أقل من 40 حرف)
+2. **النص الأساسي (Primary Text)** — 2-3 جمل مقنعة تبدأ بخطاف انتباه قوي
+3. **الوصف (Description)** — جملة واحدة تدعم العنوان
+4. **نداء للفعل (CTA)** — مثل: اطلب الآن / تسوق الآن / احجز مجاناً
+5. **هاشتاقات** — 10 هاشتاقات عربية وإنجليزية مناسبة
+6. **جمهور مقترح** — الفئة العمرية، الاهتمامات، الموقع الجغرافي
+
+اكتب كل قسم بوضوح ومنظم.`;
+
+      setTimeout(() => {
+        handleChatSend(metaPrompt, imageBase64, "image/png");
+      }, 300);
+    },
+    [setActiveTab, handleChatSend]
+  );
+
   return (
     <div className="flex h-screen bg-gray-50" dir="rtl">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} credits={userCredits} />
@@ -119,7 +142,12 @@ export default function Home() {
           )}
           {activeTab === "generate" && (
             <div className="h-full overflow-y-auto">
-              <GenerateTab onGenerate={handleGenerateImage as (prompt: string, imageBase64?: string, imageMime?: string) => Promise<GeneratedImage | null>} isLoading={isLoading} credits={userCredits} />
+              <GenerateTab
+                onGenerate={handleGenerateImage as (prompt: string, imageBase64?: string, imageMime?: string) => Promise<GeneratedImage | null>}
+                onSendToChat={handleSendToChat}
+                isLoading={isLoading}
+                credits={userCredits}
+              />
             </div>
           )}
           {activeTab === "campaign" && (
