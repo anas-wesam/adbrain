@@ -16,18 +16,14 @@ export async function POST(req: NextRequest) {
 
     const parts: Part[] = [];
 
-    const noTextInstruction = `IMPORTANT: Do NOT include any text, letters, words, numbers, or typography in the image. The image must be text-free. Focus only on visual elements, product, background, lighting, and composition.`;
-
     if (imageBase64 && imageMime) {
       parts.push({ inlineData: { data: imageBase64, mimeType: imageMime } });
       parts.push({
-        text: `You are an expert image editor. Edit this exact image as follows: ${prompt}.
-Keep the same product, object, and main subject from the original image. Only apply the requested changes.
-${noTextInstruction}`,
+        text: `Edit this image: ${prompt}. Keep the same product and main subject. High quality, professional result.`,
       });
     } else {
       parts.push({
-        text: `Create a professional high-quality advertising image: ${prompt}. Commercial quality, vibrant colors, modern clean design, studio lighting. ${noTextInstruction}`,
+        text: `${prompt}. Professional advertising photo, high quality, cinematic lighting, sharp details.`,
       });
     }
 
