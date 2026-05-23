@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Message } from "@/store/useStore";
 import { Send, Brain, User, Loader2, Paperclip, X, ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { compressImage } from "@/lib/compress";
 
 type Props = {
   messages: Message[];
@@ -24,12 +25,12 @@ export default function ChatTab({ messages, isLoading, onSend }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const result = reader.result as string;
-      // result is "data:image/jpeg;base64,XXXX"
       const [meta, base64] = result.split(",");
       const mime = meta.split(":")[1].split(";")[0];
-      setPreviewImage({ base64, mime, name: file.name });
+      const compressed = await compressImage(base64, mime);
+      setPreviewImage({ base64: compressed.base64, mime: compressed.mime, name: file.name });
     };
     reader.readAsDataURL(file);
     e.target.value = "";

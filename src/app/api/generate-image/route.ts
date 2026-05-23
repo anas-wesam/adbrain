@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, Part } from "@google/genai";
 
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GOOGLE_AI_API_KEY;
 
@@ -19,7 +21,9 @@ export async function POST(req: NextRequest) {
     if (imageBase64 && imageMime) {
       parts.push({ inlineData: { data: imageBase64, mimeType: imageMime } });
       parts.push({
-        text: `Based on this reference image, create a professional high-quality advertising photo: ${prompt}. Keep the same style, colors and composition. ${noTextInstruction}`,
+        text: `You are an expert image editor. Edit this exact image as follows: ${prompt}.
+Keep the same product, object, and main subject from the original image. Only apply the requested changes.
+${noTextInstruction}`,
       });
     } else {
       parts.push({

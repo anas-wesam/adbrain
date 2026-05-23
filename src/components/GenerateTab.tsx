@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { GeneratedImage } from "@/store/useStore";
 import { ImageIcon, Loader2, Download, Wand2, Paperclip, X, Sparkles, Type, MessageSquare } from "lucide-react";
+import { compressImage } from "@/lib/compress";
 
 type Props = {
   onGenerate: (prompt: string, imageBase64?: string, imageMime?: string) => Promise<GeneratedImage | null>;
@@ -39,11 +40,13 @@ export default function GenerateTab({ onGenerate, onSendToChat, isLoading, credi
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const result = reader.result as string;
       const [meta, base64] = result.split(",");
       const mime = meta.split(":")[1].split(";")[0];
-      setRefImage({ base64, mime, name: file.name });
+      // Compress to max 1024px to stay under Vercel's 4.5MB body limit
+      const compressed = await compressImage(base64, mime);
+      setRefImage({ base64: compressed.base64, mime: compressed.mime, name: file.name });
     };
     reader.readAsDataURL(file);
     e.target.value = "";
