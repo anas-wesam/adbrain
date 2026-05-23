@@ -1,69 +1,51 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenerativeAI, Part } from "@google/generative-ai";
+import { GoogleGenAI, Part } from "@google/genai";
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.GOOGLE_AI_API_KEY;
 
   if (!apiKey || apiKey === "your_google_ai_api_key_here") {
-    return NextResponse.json(
-      { error: "GOOGLE_AI_API_KEY غير مضبوطة." },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "GOOGLE_AI_API_KEY غير مضبوطة." }, { status: 400 });
   }
 
   try {
     const { prompt, imageBase64, imageMime } = await req.json();
-    const genAI = new GoogleGenerativeAI(apiKey);
+    const ai = new GoogleGenAI({ apiKey });
 
-    let finalPrompt: string;
+    const parts: Part[] = [];
 
     if (imageBase64 && imageMime) {
-      // Step 1: Gemini analyzes reference image + user prompt → enhanced Imagen prompt
-      const visionModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-
-      const parts: Part[] = [
-        {
-          inlineData: {
-            data: imageBase64,
-            mimeType: imageMime,
-          },
-        },
-        {
-          text: `أنت خبير في توليد صور إعلانية احترافية.
-حلّل هذه الصورة المرجعية وأنشئ prompt احترافي باللغة الإنجليزية لـ Imagen لتوليد صورة إعلانية بناءً على:
-- طلب المستخدم: "${prompt}"
-- الأسلوب والألوان والتكوين في الصورة المرجعية
-
-اكتب فقط الـ prompt الإنجليزي، بدون أي شرح أو مقدمة. يجب أن يكون وصفاً دقيقاً ومفصلاً لا يتجاوز 3 جمل.`,
-        },
-      ];
-
-      const visionResult = await visionModel.generateContent(parts);
-      finalPrompt = visionResult.response.text().trim();
+      // Reference image provided — include it for style/context
+      parts.push({
+        inlineData: { data: imageBase64, mimeType: imageMime },
+      });
+      parts.push({
+        text: `بناءً على هذه الصورة المرجعية، أنشئ صورة إعلانية احترافية عالية الجودة بالمواصفات التالية: ${prompt}. حافظ على نفس الأسلوب والألوان العامة للصورة المرجعية مع إضافة طابع إعلاني احترافي.`,
+      });
     } else {
-      // No reference image — build prompt directly
-      finalPrompt = `Professional Arabic marketing advertisement: ${prompt}. High quality commercial photography, vibrant colors, modern clean design, studio lighting.`;
+      parts.push({
+        text: `أنشئ صورة إعلانية احترافية عالية الجودة: ${prompt}. الصورة يجب أن تكون بجودة تجارية، ألوان زاهية، تصميم عصري نظيف.`,
+      });
     }
 
-    // Step 2: Generate image with Imagen
-    const imageModel = genAI.getGenerativeModel({ model: "imagen-3.0-generate-002" });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = await (imageModel as any).generateImages({
-      prompt: finalPrompt,
-      numberOfImages: 1,
-      aspectRatio: "1:1",
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image",
+      contents: [{ role: "user", parts }],
+      config: { responseModalities: ["IMAGE", "TEXT"] },
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const imageData = (result as any).generatedImages[0].image.imageBytes;
-    const base64 = Buffer.from(imageData).toString("base64");
+    const responseParts = response.candidates?.[0]?.content?.parts || [];
+    const imgPart = responseParts.find((p: Part) => p.inlineData);
 
-    return NextResponse.json({ imageData: base64, usedPrompt: finalPrompt });
+    if (!imgPart?.inlineData?.data) {
+      return NextResponse.json({ error: "لم يتم توليد صورة. حاول بوصف مختلف." }, { status: 500 });
+    }
+
+    return NextResponse.json({ imageData: imgPart.inlineData.data });
   } catch (error) {
     console.error("Image generation error:", error);
     return NextResponse.json(
-      { error: "حدث خطأ في توليد الصورة. تأكد من صلاحيات API Key." },
+      { error: "حدث خطأ في توليد الصورة. حاول مرة أخرى." },
       { status: 500 }
     );
   }
