@@ -5,7 +5,7 @@ import ChatTab from "@/components/ChatTab";
 import GenerateTab from "@/components/GenerateTab";
 import CampaignTab from "@/components/CampaignTab";
 import GalleryTab from "@/components/GalleryTab";
-import { useAppStore } from "@/store/useStore";
+import { useAppStore, GeneratedImage } from "@/store/useStore";
 import { saveMessage, saveImageRecord } from "@/hooks/useFirestore";
 import { uploadBase64Image } from "@/hooks/useStorage";
 
@@ -60,7 +60,7 @@ export default function Home() {
   );
 
   const handleGenerateImage = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, imageBase64?: string, imageMime?: string) => {
       if (userCredits < 5) return null;
       setIsLoading(true);
       deductCredits(5);
@@ -69,13 +69,12 @@ export default function Home() {
         const res = await fetch("/api/generate-image", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt }),
+          body: JSON.stringify({ prompt, imageBase64, imageMime }),
         });
         const data = await res.json();
         if (data.imageData) {
           const img = addImage({ prompt, imageData: data.imageData });
 
-          // Upload to Firebase Storage & save record (fire-and-forget)
           uploadBase64Image(data.imageData, `${img.id}.png`)
             .then((storageUrl) =>
               saveImageRecord({ prompt, storageUrl, sessionId })
@@ -120,7 +119,7 @@ export default function Home() {
           )}
           {activeTab === "generate" && (
             <div className="h-full overflow-y-auto">
-              <GenerateTab onGenerate={handleGenerateImage} isLoading={isLoading} credits={userCredits} />
+              <GenerateTab onGenerate={handleGenerateImage as (prompt: string, imageBase64?: string, imageMime?: string) => Promise<GeneratedImage | null>} isLoading={isLoading} credits={userCredits} />
             </div>
           )}
           {activeTab === "campaign" && (
