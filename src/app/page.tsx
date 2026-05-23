@@ -1,13 +1,19 @@
 "use client";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatTab from "@/components/ChatTab";
 import GenerateTab from "@/components/GenerateTab";
 import CampaignTab from "@/components/CampaignTab";
 import GalleryTab from "@/components/GalleryTab";
 import { useAppStore } from "@/store/useStore";
+import { saveMessage, saveImageRecord } from "@/hooks/useFirestore";
+import { uploadBase64Image } from "@/hooks/useStorage";
+
+const SESSION_ID = "session_" + Math.random().toString(36).slice(2, 10);
 
 export default function Home() {
+  const sessionId = useRef(SESSION_ID).current;
+
   const {
     messages,
     images,
@@ -28,6 +34,9 @@ export default function Home() {
       setIsLoading(true);
       deductCredits(1);
 
+      // Save user message to Firestore (fire-and-forget)
+      saveMessage(sessionId, { role: "user", content: text }).catch(() => {});
+
       try {
         const allMessages = [
           ...messages,
@@ -39,18 +48,16 @@ export default function Home() {
           body: JSON.stringify({ messages: allMessages }),
         });
         const data = await res.json();
-        if (data.text) {
-          addMessage({ role: "assistant", content: data.text });
-        } else {
-          addMessage({ role: "assistant", content: "عذراً، حدث خطأ. حاول مرة أخرى." });
-        }
+        const replyText = data.text || "عذراً، حدث خطأ. حاول مرة أخرى.";
+        addMessage({ role: "assistant", content: replyText });
+        saveMessage(sessionId, { role: "assistant", content: replyText }).catch(() => {});
       } catch {
         addMessage({ role: "assistant", content: "عذراً، حدث خطأ في الاتصال." });
       } finally {
         setIsLoading(false);
       }
     },
-    [messages, userCredits, addMessage, setIsLoading, deductCredits]
+    [messages, userCredits, addMessage, setIsLoading, deductCredits, sessionId]
   );
 
   const handleGenerateImage = useCallback(
@@ -68,6 +75,14 @@ export default function Home() {
         const data = await res.json();
         if (data.imageData) {
           const img = addImage({ prompt, imageData: data.imageData });
+
+          // Upload to Firebase Storage & save record (fire-and-forget)
+          uploadBase64Image(data.imageData, `${img.id}.png`)
+            .then((storageUrl) =>
+              saveImageRecord({ prompt, storageUrl, sessionId })
+            )
+            .catch(() => {});
+
           return img;
         }
         return null;
@@ -77,7 +92,7 @@ export default function Home() {
         setIsLoading(false);
       }
     },
-    [userCredits, addImage, setIsLoading, deductCredits]
+    [userCredits, addImage, setIsLoading, deductCredits, sessionId]
   );
 
   return (
