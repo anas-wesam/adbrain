@@ -1,63 +1,124 @@
-import Image from "next/image";
+"use client";
+import { useCallback } from "react";
+import Sidebar from "@/components/Sidebar";
+import ChatTab from "@/components/ChatTab";
+import GenerateTab from "@/components/GenerateTab";
+import CampaignTab from "@/components/CampaignTab";
+import GalleryTab from "@/components/GalleryTab";
+import { useAppStore } from "@/store/useStore";
 
 export default function Home() {
+  const {
+    messages,
+    images,
+    userCredits,
+    activeTab,
+    isLoading,
+    setActiveTab,
+    setIsLoading,
+    addMessage,
+    addImage,
+    deductCredits,
+  } = useAppStore();
+
+  const handleChatSend = useCallback(
+    async (text: string) => {
+      if (userCredits < 1) return;
+      addMessage({ role: "user", content: text });
+      setIsLoading(true);
+      deductCredits(1);
+
+      try {
+        const allMessages = [
+          ...messages,
+          { role: "user" as const, content: text },
+        ];
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ messages: allMessages }),
+        });
+        const data = await res.json();
+        if (data.text) {
+          addMessage({ role: "assistant", content: data.text });
+        } else {
+          addMessage({ role: "assistant", content: "عذراً، حدث خطأ. حاول مرة أخرى." });
+        }
+      } catch {
+        addMessage({ role: "assistant", content: "عذراً، حدث خطأ في الاتصال." });
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [messages, userCredits, addMessage, setIsLoading, deductCredits]
+  );
+
+  const handleGenerateImage = useCallback(
+    async (prompt: string) => {
+      if (userCredits < 5) return null;
+      setIsLoading(true);
+      deductCredits(5);
+
+      try {
+        const res = await fetch("/api/generate-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt }),
+        });
+        const data = await res.json();
+        if (data.imageData) {
+          const img = addImage({ prompt, imageData: data.imageData });
+          return img;
+        }
+        return null;
+      } catch {
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [userCredits, addImage, setIsLoading, deductCredits]
+  );
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+    <div className="flex h-screen bg-gray-50" dir="rtl">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} credits={userCredits} />
+
+      <main className="flex-1 flex flex-col overflow-hidden">
+        <header className="bg-white border-b border-gray-100 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-gray-500">
+              {activeTab === "chat" && "تحدّث مع مساعدك التسويقي"}
+              {activeTab === "generate" && "ولّد صور إعلانية بالذكاء الاصطناعي"}
+              {activeTab === "campaign" && "أنشئ حملة تسويقية متكاملة"}
+              {activeTab === "gallery" && "جميع الصور المُنشأة"}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <span className="text-sm text-gray-500">متصل بـ Gemini</span>
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 overflow-hidden">
+          {activeTab === "chat" && (
+            <ChatTab messages={messages} isLoading={isLoading} onSend={handleChatSend} />
+          )}
+          {activeTab === "generate" && (
+            <div className="h-full overflow-y-auto">
+              <GenerateTab onGenerate={handleGenerateImage} isLoading={isLoading} credits={userCredits} />
+            </div>
+          )}
+          {activeTab === "campaign" && (
+            <div className="h-full overflow-y-auto">
+              <CampaignTab onGenerate={handleChatSend} isLoading={isLoading} />
+            </div>
+          )}
+          {activeTab === "gallery" && (
+            <div className="h-full overflow-y-auto">
+              <GalleryTab images={images} />
+            </div>
+          )}
         </div>
       </main>
     </div>
