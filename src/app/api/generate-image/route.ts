@@ -58,9 +58,9 @@ async function generateWithCloudflare(prompt: string, imageBase64: string): Prom
       body: JSON.stringify({
         prompt,
         image: imageArray,
-        strength: 0.55,
+        strength: 0.35,
         num_steps: 20,
-        guidance: 8,
+        guidance: 7.5,
       }),
     }
   );
