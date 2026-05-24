@@ -55,9 +55,13 @@ export default function GenerateTab({ onGenerate, onSendToChat, isLoading, credi
   const handleGenerate = async () => {
     if (!prompt.trim() || isLoading || credits < 5) return;
     setError("");
-    const img = await onGenerate(prompt.trim(), refImage?.base64, refImage?.mime);
-    if (img) setLastImage(img);
-    else setError("حدث خطأ في توليد الصورة. حاول مرة أخرى.");
+    try {
+      const img = await onGenerate(prompt.trim(), refImage?.base64, refImage?.mime);
+      if (img) setLastImage(img);
+      else setError("حدث خطأ في توليد الصورة. حاول مرة أخرى.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "حدث خطأ في توليد الصورة. حاول مرة أخرى.");
+    }
   };
 
   // Draw image + Arabic text overlay on canvas then download
@@ -146,7 +150,7 @@ export default function GenerateTab({ onGenerate, onSendToChat, isLoading, credi
                 <span className="text-sm font-medium text-purple-700">صورة مرجعية مرفقة</span>
               </div>
               <p className="text-xs text-purple-500">{refImage.name}</p>
-              <p className="text-xs text-gray-400 mt-1">Gemini سيحلل الصورة ويولّد بناءً عليها</p>
+              <p className="text-xs text-gray-400 mt-1">اكتب التعديل بالإنجليزي للنتيجة الأفضل — مثال: add 20% OFF badge, golden background</p>
             </div>
           </div>
         ) : (
@@ -171,7 +175,7 @@ export default function GenerateTab({ onGenerate, onSendToChat, isLoading, credi
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder={refImage ? "صف ما تريد بناءً على الصورة... مثال: نفس المنتج بخلفية بيضاء" : "مثال: إعلان عطر فاخر، خلفية ذهبية، جودة عالية..."}
+          placeholder={refImage ? "مثال: add 20% OFF badge top right, luxury dark background" : "مثال: إعلان عطر فاخر، خلفية ذهبية، جودة عالية..."}
           rows={3}
           className="w-full resize-none text-right text-sm focus:outline-none text-gray-700 placeholder-gray-400"
         />

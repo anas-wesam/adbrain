@@ -1,7 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { Message } from "@/store/useStore";
-import { Send, Brain, User, Loader2, Paperclip, X, ImageIcon } from "lucide-react";
+import { Send, Brain, User, Loader2, Paperclip, X, ImageIcon, ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { compressImage } from "@/lib/compress";
 
@@ -9,9 +9,10 @@ type Props = {
   messages: Message[];
   isLoading: boolean;
   onSend: (text: string, imageBase64?: string, imageMime?: string) => void;
+  onTransferToCampaign?: () => void;
 };
 
-export default function ChatTab({ messages, isLoading, onSend }: Props) {
+export default function ChatTab({ messages, isLoading, onSend, onTransferToCampaign }: Props) {
   const [input, setInput] = useState("");
   const [previewImage, setPreviewImage] = useState<{ base64: string; mime: string; name: string } | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -43,6 +44,8 @@ export default function ChatTab({ messages, isLoading, onSend }: Props) {
     setInput("");
     setPreviewImage(null);
   };
+
+  const lastAssistantId = messages.filter((m) => m.role === "assistant").at(-1)?.id;
 
   return (
     <div className="flex flex-col h-full">
@@ -77,8 +80,8 @@ export default function ChatTab({ messages, isLoading, onSend }: Props) {
         )}
 
         {messages.map((msg) => (
+          <div key={msg.id}>
           <div
-            key={msg.id}
             className={cn("flex gap-3", msg.role === "user" ? "flex-row-reverse" : "flex-row")}
           >
             <div
@@ -115,6 +118,18 @@ export default function ChatTab({ messages, isLoading, onSend }: Props) {
                 {msg.timestamp.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })}
               </p>
             </div>
+          </div>
+          {msg.id === lastAssistantId && onTransferToCampaign && !isLoading && (
+            <div className="flex pr-12 mt-2">
+              <button
+                onClick={onTransferToCampaign}
+                className="flex items-center gap-1.5 text-xs bg-gradient-to-r from-purple-600 to-blue-600 text-white px-4 py-2 rounded-xl hover:shadow-md transition-all font-medium"
+              >
+                <ArrowUpRight className="w-3.5 h-3.5" />
+                نقل للحملة
+              </button>
+            </div>
+          )}
           </div>
         ))}
 

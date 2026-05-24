@@ -1,10 +1,16 @@
 "use client";
-import { useState } from "react";
-import { Megaphone, Loader2, Copy, CheckCheck } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Megaphone, Loader2, Copy, CheckCheck, Sparkles } from "lucide-react";
+
+type TransferredData = {
+  imageBase64?: string;
+  adContent?: string;
+};
 
 type Props = {
   onGenerate: (prompt: string) => void;
   isLoading: boolean;
+  initialData?: TransferredData | null;
 };
 
 type CampaignResult = {
@@ -15,7 +21,7 @@ type CampaignResult = {
   email: string;
 };
 
-export default function CampaignTab({ onGenerate, isLoading }: Props) {
+export default function CampaignTab({ onGenerate, isLoading, initialData }: Props) {
   const [brand, setBrand] = useState("");
   const [product, setProduct] = useState("");
   const [audience, setAudience] = useState("");
@@ -23,6 +29,13 @@ export default function CampaignTab({ onGenerate, isLoading }: Props) {
   const [result, setResult] = useState<CampaignResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [transferred, setTransferred] = useState<TransferredData | null>(null);
+
+  useEffect(() => {
+    if (initialData) {
+      setTransferred(initialData);
+    }
+  }, [initialData]);
 
   const goals = ["زيادة المبيعات", "بناء الوعي بالعلامة", "جذب متابعين", "تشجيع التجربة"];
 
@@ -87,6 +100,36 @@ export default function CampaignTab({ onGenerate, isLoading }: Props) {
         <h2 className="text-2xl font-bold text-gray-800 mb-2">حملة إعلانية كاملة</h2>
         <p className="text-gray-500">أدخل تفاصيل مشروعك وسنولّد حملة تسويقية متكاملة</p>
       </div>
+
+      {transferred && (
+        <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-2xl p-5 mb-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-600" />
+            <span className="text-sm font-semibold text-purple-700">المحتوى المنقول من الشات الذكي</span>
+          </div>
+          {transferred.imageBase64 && (
+            <img
+              src={`data:image/png;base64,${transferred.imageBase64}`}
+              alt="الصورة الإعلانية"
+              className="w-full max-h-72 object-contain rounded-xl border border-purple-200 bg-white"
+            />
+          )}
+          {transferred.adContent && (
+            <div className="relative">
+              <button
+                onClick={() => { navigator.clipboard.writeText(transferred.adContent!); setCopied("transferred"); setTimeout(() => setCopied(null), 2000); }}
+                className="absolute top-2 left-2 flex items-center gap-1 text-xs text-gray-400 hover:text-purple-600 transition-colors"
+              >
+                {copied === "transferred" ? <CheckCheck className="w-4 h-4 text-green-500" /> : <Copy className="w-4 h-4" />}
+                {copied === "transferred" ? "تم النسخ!" : "نسخ"}
+              </button>
+              <p className="text-sm text-gray-700 text-right leading-relaxed whitespace-pre-wrap bg-white rounded-xl p-4 pt-8 border border-purple-100">
+                {transferred.adContent}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-2xl p-5 space-y-4 mb-6">
         <div>

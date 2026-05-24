@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import ChatTab from "@/components/ChatTab";
 import GenerateTab from "@/components/GenerateTab";
@@ -14,6 +14,7 @@ const SESSION_ID = "session_" + Math.random().toString(36).slice(2, 10);
 
 export default function Home() {
   const sessionId = useRef(SESSION_ID).current;
+  const [campaignData, setCampaignData] = useState<{ imageBase64?: string; adContent?: string } | null>(null);
 
   const {
     messages,
@@ -73,15 +74,13 @@ export default function Home() {
           body: JSON.stringify({ prompt, imageBase64, imageMime }),
         });
         const data = await res.json();
+        if (data.error) throw new Error(data.error);
         if (data.imageData) {
           const img = await addImage({ prompt, imageData: data.imageData });
 
-          // Save thumbnail to Firestore immediately so gallery persists on refresh
-          // Use local UUID as Firestore doc ID so deduplication works in gallery
           const thumb = await compressImage(data.imageData, "image/png", 400, 0.5);
           saveImageRecord({ id: img.id, prompt, sessionId, thumbnailBase64: thumb.base64 })
             .then(() => {
-              // Try to upgrade to full Storage URL in background
               uploadBase64Image(data.imageData, `${img.id}.png`)
                 .then((storageUrl) => updateImageRecord(img.id, { storageUrl }))
                 .catch(() => {});
@@ -90,9 +89,9 @@ export default function Home() {
 
           return img;
         }
-        return null;
-      } catch {
-        return null;
+        throw new Error("لم يتم إرجاع صورة من الخادم");
+      } catch (err) {
+        throw err;
       } finally {
         setIsLoading(false);
       }
@@ -127,6 +126,16 @@ export default function Home() {
     [setActiveTab, handleChatSend]
   );
 
+  const handleTransferToCampaign = useCallback(() => {
+    const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
+    const lastUserWithImage = [...messages].reverse().find((m) => m.role === "user" && m.imageBase64);
+    setCampaignData({
+      imageBase64: lastUserWithImage?.imageBase64,
+      adContent: lastAssistant?.content,
+    });
+    setActiveTab("campaign");
+  }, [messages, setActiveTab]);
+
   return (
     <div className="flex h-screen bg-gray-50" dir="rtl">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} credits={userCredits} />
@@ -149,7 +158,7 @@ export default function Home() {
 
         <div className="flex-1 overflow-hidden">
           {activeTab === "chat" && (
-            <ChatTab messages={messages} isLoading={isLoading} onSend={handleChatSend as (text: string, imageBase64?: string, imageMime?: string) => void} />
+            <ChatTab messages={messages} isLoading={isLoading} onSend={handleChatSend as (text: string, imageBase64?: string, imageMime?: string) => void} onTransferToCampaign={handleTransferToCampaign} />
           )}
           {activeTab === "generate" && (
             <div className="h-full overflow-y-auto">
@@ -163,7 +172,7 @@ export default function Home() {
           )}
           {activeTab === "campaign" && (
             <div className="h-full overflow-y-auto">
-              <CampaignTab onGenerate={handleChatSend} isLoading={isLoading} />
+              <CampaignTab onGenerate={handleChatSend} isLoading={isLoading} initialData={campaignData} />
             </div>
           )}
           {activeTab === "gallery" && (

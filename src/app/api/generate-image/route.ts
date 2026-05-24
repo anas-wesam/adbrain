@@ -1,87 +1,114 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI, Part } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 export const maxDuration = 60;
 
-/** Pollinations AI — free, no API key required */
-async function generateWithPollinations(prompt: string): Promise<string> {
-  const fullPrompt = `${prompt}. Professional advertising photo, high quality, cinematic lighting, sharp details, 4K.`;
-  const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=1024&height=1024&model=flux&nologo=true&seed=${Date.now()}`;
-  const res = await fetch(url, { method: "GET" });
-  if (!res.ok) throw new Error(`Pollinations error: ${res.status}`);
-  const buffer = await res.arrayBuffer();
+async function enhancePrompt(userPrompt: string): Promise<string> {
+  const apiKey = process.env.GOOGLE_AI_API_KEY;
+  if (!apiKey) return userPrompt;
+  const ai = new GoogleGenAI({ apiKey });
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash",
+    contents: [{
+      role: "user",
+      parts: [{
+        text: `Convert this advertising request into a clear image editing instruction for an AI image editor. Be specific about what visual changes to make (background, text, badges, colors, lighting). Keep it under 2 sentences. Do NOT mention keeping the product - just describe what to ADD or CHANGE.
+
+Request: "${userPrompt}"
+
+Output only the editing instruction in English, nothing else.`
+      }]
+    }]
+  });
+  return response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || userPrompt;
+}
+
+async function generateWithReplicate(prompt: string, inputImageBase64?: string): Promise<string> {
+  const apiKey = process.env.REPLICATE_API_KEY;
+  if (!apiKey) throw new Error("No Replicate API key");
+
+  const input: Record<string, string> = { prompt };
+  if (inputImageBase64) {
+    input.input_image = "data:image/jpeg;base64," + inputImageBase64;
+  }
+
+  const res = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-pro/predictions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+      "Prefer": "wait",
+    },
+    body: JSON.stringify({ input }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.detail || JSON.stringify(data) || "Replicate error");
+
+  const rawOutput = data.output;
+  const outputUrl = Array.isArray(rawOutput) ? rawOutput[0] : rawOutput;
+  if (!outputUrl) throw new Error(`No output URL from Replicate (status: ${data.status}, id: ${data.id})`);
+
+  const imgRes = await fetch(outputUrl);
+  if (!imgRes.ok) throw new Error("Failed to fetch output image");
+  const buffer = await imgRes.arrayBuffer();
   return Buffer.from(buffer).toString("base64");
 }
 
-/** Try Gemini image generation with a specific model; returns base64 string or throws */
-async function generateWithGeminiModel(
-  apiKey: string,
-  model: string,
-  prompt: string,
-  imageBase64?: string,
-  imageMime?: string
-): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey });
-  const parts: Part[] = [];
+async function generateWithFlux(prompt: string): Promise<string> {
+  const apiKey = process.env.TOGETHER_API_KEY;
+  if (!apiKey) throw new Error("No Together API key");
 
-  if (imageBase64 && imageMime) {
-    parts.push({ inlineData: { data: imageBase64, mimeType: imageMime } });
-    parts.push({
-      text: `Edit this image: ${prompt}. Keep the same product and main subject. High quality, professional result.`,
-    });
-  } else {
-    parts.push({
-      text: `${prompt}. Professional advertising photo, high quality, cinematic lighting, sharp details.`,
-    });
-  }
-
-  const response = await ai.models.generateContent({
-    model,
-    contents: [{ role: "user", parts }],
-    config: { responseModalities: ["IMAGE", "TEXT"] },
+  const res = await fetch("https://api.together.xyz/v1/images/generations", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "black-forest-labs/FLUX.1-schnell",
+      prompt,
+      width: 1024,
+      height: 1024,
+      steps: 4,
+      n: 1,
+    }),
   });
 
-  const responseParts = response.candidates?.[0]?.content?.parts || [];
-  const imgPart = responseParts.find((p: Part) => p.inlineData);
-  if (!imgPart?.inlineData?.data) throw new Error("No image in Gemini response");
-  return imgPart.inlineData.data;
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error?.message || "Together error");
+  const imageUrl = data?.data?.[0]?.url;
+  if (!imageUrl) throw new Error("No image URL");
+  const imgRes = await fetch(imageUrl);
+  const buffer = await imgRes.arrayBuffer();
+  return Buffer.from(buffer).toString("base64");
 }
 
 export async function POST(req: NextRequest) {
   const { prompt, imageBase64, imageMime } = await req.json();
-  const apiKey = process.env.GOOGLE_AI_API_KEY;
-  const hasValidKey = apiKey && apiKey !== "your_google_ai_api_key_here";
-
-  // Gemini models to try in order (same free models used for chat first)
-  const geminiModels = [
-    "gemini-2.5-flash",
-    "gemini-2.0-flash-exp",
-    "gemini-2.5-flash-image",
-  ];
 
   try {
-    if (hasValidKey) {
-      for (const model of geminiModels) {
-        try {
-          const imageData = await generateWithGeminiModel(apiKey!, model, prompt, imageBase64, imageMime);
-          console.log(`Image generated with ${model}`);
-          return NextResponse.json({ imageData });
-        } catch (err) {
-          console.warn(`${model} failed:`, err);
-          // Try next model ↓
-        }
+    if (imageBase64 && imageMime) {
+      let enhancedPrompt = prompt;
+      try {
+        enhancedPrompt = await enhancePrompt(prompt);
+        console.log("Enhanced prompt:", enhancedPrompt);
+      } catch {
+        console.warn("Gemini enhance failed, using original prompt");
       }
+      const imageData = await generateWithReplicate(enhancedPrompt, imageBase64);
+      return NextResponse.json({ imageData });
     }
 
-    // Final fallback: Pollinations AI (free, no key needed)
-    console.warn("All Gemini models failed, using Pollinations");
-    const imageData = await generateWithPollinations(prompt);
-    return NextResponse.json({ imageData });
-  } catch (error) {
-    console.error("Image generation error:", error);
-    return NextResponse.json(
-      { error: "حدث خطأ في توليد الصورة. حاول مرة أخرى." },
-      { status: 500 }
+    // Text-to-image: use Together AI FLUX schnell
+    const imageData = await generateWithFlux(
+      `${prompt}. Professional advertising photo, no people, no humans, studio lighting, high quality.`
     );
+    return NextResponse.json({ imageData });
+
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
