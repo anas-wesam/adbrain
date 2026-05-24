@@ -9,6 +9,7 @@ type Props = {
   onSendToChat: (imageBase64: string, prompt: string) => void;
   isLoading: boolean;
   credits: number;
+  externalRefImage?: { base64: string; mime: string; name: string } | null;
 };
 
 const suggestions = [
@@ -26,7 +27,7 @@ const overlayPositions = [
 
 type OverlayPosition = "top" | "center" | "bottom";
 
-export default function GenerateTab({ onGenerate, onSendToChat, isLoading, credits }: Props) {
+export default function GenerateTab({ onGenerate, onSendToChat, isLoading, credits, externalRefImage }: Props) {
   const [prompt, setPrompt] = useState("");
   const [lastImage, setLastImage] = useState<GeneratedImage | null>(null);
   const [error, setError] = useState("");
@@ -35,6 +36,11 @@ export default function GenerateTab({ onGenerate, onSendToChat, isLoading, credi
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>("bottom");
   const fileRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Apply external ref image from store tab
+  useEffect(() => {
+    if (externalRefImage) setRefImage(externalRefImage);
+  }, [externalRefImage]);
 
   // Load demo image on mount
   useEffect(() => {

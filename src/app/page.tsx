@@ -5,6 +5,7 @@ import ChatTab from "@/components/ChatTab";
 import GenerateTab from "@/components/GenerateTab";
 import CampaignTab from "@/components/CampaignTab";
 import GalleryTab from "@/components/GalleryTab";
+import StoreTab from "@/components/StoreTab";
 import { useAppStore, GeneratedImage } from "@/store/useStore";
 import { saveMessage, saveImageRecord, updateImageRecord } from "@/hooks/useFirestore";
 import { uploadBase64Image } from "@/hooks/useStorage";
@@ -15,6 +16,7 @@ const SESSION_ID = "session_" + Math.random().toString(36).slice(2, 10);
 export default function Home() {
   const sessionId = useRef(SESSION_ID).current;
   const [campaignData, setCampaignData] = useState<{ imageBase64?: string; adContent?: string } | null>(null);
+  const [storeProductRef, setStoreProductRef] = useState<{ base64: string; mime: string; name: string } | null>(null);
 
   const {
     messages,
@@ -126,6 +128,26 @@ export default function Home() {
     [setActiveTab, handleChatSend]
   );
 
+  const handleStoreProduct = useCallback(async (imageUrl: string, productName: string) => {
+    try {
+      const res = await fetch(imageUrl);
+      const blob = await res.blob();
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const dataUrl = reader.result as string;
+        const [meta, base64] = dataUrl.split(",");
+        const mime = meta.split(":")[1].split(";")[0];
+        const { compressImage } = await import("@/lib/compress");
+        const compressed = await compressImage(base64, mime);
+        setStoreProductRef({ base64: compressed.base64, mime: compressed.mime, name: productName });
+        setActiveTab("generate");
+      };
+      reader.readAsDataURL(blob);
+    } catch {
+      setActiveTab("generate");
+    }
+  }, [setActiveTab]);
+
   const handleTransferToCampaign = useCallback(() => {
     const lastAssistant = [...messages].reverse().find((m) => m.role === "assistant");
     const lastUserWithImage = [...messages].reverse().find((m) => m.role === "user" && m.imageBase64);
@@ -148,6 +170,7 @@ export default function Home() {
               {activeTab === "generate" && "ولّد صور إعلانية بالذكاء الاصطناعي"}
               {activeTab === "campaign" && "أنشئ حملة تسويقية متكاملة"}
               {activeTab === "gallery" && "جميع الصور المُنشأة"}
+              {activeTab === "store" && "منتجات متجر إيزي أوردر"}
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
@@ -167,6 +190,7 @@ export default function Home() {
                 onSendToChat={handleSendToChat}
                 isLoading={isLoading}
                 credits={userCredits}
+                externalRefImage={storeProductRef}
               />
             </div>
           )}
@@ -178,6 +202,11 @@ export default function Home() {
           {activeTab === "gallery" && (
             <div className="h-full overflow-y-auto">
               <GalleryTab images={images} />
+            </div>
+          )}
+          {activeTab === "store" && (
+            <div className="h-full overflow-y-auto">
+              <StoreTab onGenerateAd={handleStoreProduct} />
             </div>
           )}
         </div>

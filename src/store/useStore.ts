@@ -17,7 +17,7 @@ export type GeneratedImage = {
   timestamp: Date;
 };
 
-export type ActiveTab = "chat" | "generate" | "campaign" | "gallery";
+export type ActiveTab = "chat" | "generate" | "campaign" | "gallery" | "store";
 
 let credits = 100;
 

@@ -8,6 +8,7 @@ import {
   GalleryHorizontalEnd,
   Zap,
   Brain,
+  Store,
 } from "lucide-react";
 
 const tabs = [
@@ -15,6 +16,7 @@ const tabs = [
   { id: "gallery" as ActiveTab, label: "معرض الصور", icon: GalleryHorizontalEnd },
   { id: "chat" as ActiveTab, label: "الشات الذكي", icon: MessageSquare },
   { id: "campaign" as ActiveTab, label: "حملة إعلانية", icon: Megaphone },
+  { id: "store" as ActiveTab, label: "إيزي أوردر", icon: Store },
 ];
 
 type Props = {
