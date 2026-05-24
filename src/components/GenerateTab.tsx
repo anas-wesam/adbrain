@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { GeneratedImage } from "@/store/useStore";
 import { ImageIcon, Loader2, Download, Wand2, Paperclip, X, Sparkles, Type, MessageSquare } from "lucide-react";
 import { compressImage } from "@/lib/compress";
@@ -35,6 +35,27 @@ export default function GenerateTab({ onGenerate, onSendToChat, isLoading, credi
   const [overlayPos, setOverlayPos] = useState<OverlayPosition>("bottom");
   const fileRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Load demo image on mount
+  useEffect(() => {
+    fetch("/demo.webp")
+      .then((r) => r.blob())
+      .then((blob) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          const base64 = dataUrl.split(",")[1];
+          setLastImage({
+            id: "demo",
+            prompt: "إعلان ساعة G-Shape RGB ذكية مع شاحن لاسلكي",
+            imageData: base64,
+            timestamp: new Date(),
+          });
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
