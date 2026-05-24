@@ -170,7 +170,7 @@ export default function Home() {
               {activeTab === "generate" && "ولّد صور إعلانية بالذكاء الاصطناعي"}
               {activeTab === "campaign" && "أنشئ حملة تسويقية متكاملة"}
               {activeTab === "gallery" && "جميع الصور المُنشأة"}
-              {activeTab === "store" && "منتجات متجر إيزي أوردر"}
+              {activeTab === "store" && "منتجات المتجر"}
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />

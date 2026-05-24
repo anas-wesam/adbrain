@@ -103,7 +103,7 @@ export default function StoreTab({ onGenerateAd }: Props) {
     <div className="p-6 max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">ربط متجر إيزي أوردر</h2>
+        <h2 className="text-2xl font-bold text-gray-800 mb-2">ربط المتجر</h2>
         <p className="text-gray-500">اربط متجرك واستورد منتجاتك لتوليد إعلانات تلقائياً</p>
       </div>
 
