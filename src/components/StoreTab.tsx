@@ -4,12 +4,15 @@ import { Store, Link, Loader2, Wand2, RefreshCw, AlertCircle, ShoppingBag } from
 
 type Product = {
   id: number | string;
-  title?: string;
   name?: string;
+  title?: string;
   price?: string | number;
+  sale_price?: string | number;
   images?: string[];
+  thumb?: string;
   thumbnail?: string;
   image?: string;
+  slug?: string;
 };
 
 type Props = {
@@ -46,10 +49,10 @@ export default function StoreTab({ onGenerateAd }: Props) {
       if (data.error) throw new Error(data.error);
 
       const list: Product[] = data.products || [];
-      const lastPage = data.meta?.last_page || data.pagination?.total_pages || 1;
+      const totalPages = data.totalPages || 1;
 
       setProducts(pageNum === 1 ? list : (prev) => [...prev, ...list]);
-      setHasMore(pageNum < lastPage && data.source === "api");
+      setHasMore(pageNum < totalPages);
       setConnected(true);
       localStorage.setItem(LS_KEY, url);
     } catch (err) {
@@ -77,6 +80,7 @@ export default function StoreTab({ onGenerateAd }: Props) {
 
   const getProductImage = (p: Product): string | null => {
     if (p.images && p.images.length > 0) return p.images[0];
+    if (p.thumb) return p.thumb;
     if (p.thumbnail) return p.thumbnail;
     if (p.image) return p.image;
     return null;
@@ -174,8 +178,15 @@ export default function StoreTab({ onGenerateAd }: Props) {
                   )}
                   <div className="p-3">
                     <p className="text-sm font-medium text-gray-800 text-right line-clamp-2 mb-1">{name}</p>
-                    {product.price && (
-                      <p className="text-xs text-purple-600 font-bold text-right mb-3">{product.price}</p>
+                    {(product.sale_price || product.price) && (
+                      <div className="flex items-center justify-end gap-2 mb-3">
+                        {product.sale_price && (
+                          <span className="text-xs text-purple-600 font-bold">{product.sale_price} ج</span>
+                        )}
+                        <span className={`text-xs font-bold ${product.sale_price ? "line-through text-gray-400" : "text-purple-600"}`}>
+                          {product.price} ج
+                        </span>
+                      </div>
                     )}
                     <button
                       onClick={() => handleGenerateAd(product)}
