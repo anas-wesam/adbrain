@@ -23,33 +23,32 @@ Output only the editing instruction in English, nothing else.`
   return response.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || userPrompt;
 }
 
-async function generateWithReplicate(prompt: string, inputImageBase64?: string): Promise<string> {
-  const apiKey = process.env.REPLICATE_API_KEY;
-  if (!apiKey) throw new Error("No Replicate API key");
+async function generateWithKontext(prompt: string, inputImageBase64: string): Promise<string> {
+  const apiKey = process.env.TOGETHER_API_KEY;
+  if (!apiKey) throw new Error("No Together API key");
 
-  const input: Record<string, string> = { prompt };
-  if (inputImageBase64) {
-    input.input_image = "data:image/jpeg;base64," + inputImageBase64;
-  }
-
-  const res = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-kontext-pro/predictions", {
+  const res = await fetch("https://api.together.xyz/v1/images/generations", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "Prefer": "wait",
     },
-    body: JSON.stringify({ input }),
+    body: JSON.stringify({
+      model: "black-forest-labs/FLUX.1-kontext-dev",
+      prompt,
+      image_url: `data:image/jpeg;base64,${inputImageBase64}`,
+      width: 1024,
+      height: 1024,
+      steps: 28,
+      n: 1,
+    }),
   });
 
   const data = await res.json();
-  if (!res.ok) throw new Error(data?.detail || JSON.stringify(data) || "Replicate error");
-
-  const rawOutput = data.output;
-  const outputUrl = Array.isArray(rawOutput) ? rawOutput[0] : rawOutput;
-  if (!outputUrl) throw new Error(`No output URL from Replicate (status: ${data.status}, id: ${data.id})`);
-
-  const imgRes = await fetch(outputUrl);
+  if (!res.ok) throw new Error(data?.error?.message || JSON.stringify(data) || "Together Kontext error");
+  const imageUrl = data?.data?.[0]?.url;
+  if (!imageUrl) throw new Error("No image URL from Together Kontext");
+  const imgRes = await fetch(imageUrl);
   if (!imgRes.ok) throw new Error("Failed to fetch output image");
   const buffer = await imgRes.arrayBuffer();
   return Buffer.from(buffer).toString("base64");
@@ -96,7 +95,7 @@ export async function POST(req: NextRequest) {
       } catch {
         console.warn("Gemini enhance failed, using original prompt");
       }
-      const imageData = await generateWithReplicate(enhancedPrompt, imageBase64);
+      const imageData = await generateWithKontext(enhancedPrompt, imageBase64);
       return NextResponse.json({ imageData });
     }
 
